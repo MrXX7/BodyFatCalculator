@@ -11,7 +11,17 @@ struct ContentView: View {
     @State private var weight: String = "" // Weight in kg
     @State private var height: String = "" // Height in cm
     @State private var waist: String = ""  // Waist circumference in cm
+    @State private var neck: String = ""   // Neck circumference in cm
+    @State private var hip: String = ""    // Hip circumference in cm (for females)
+    @State private var age: String = ""    // Age in years
+    @State private var selectedGender: Gender = .male // Default to Male
     @State private var bodyFatPercentage: String = "0.0" // Body fat percentage
+
+    enum Gender: String, CaseIterable, Identifiable {
+        case male = "Male"
+        case female = "Female"
+        var id: String { self.rawValue }
+    }
 
     var body: some View {
         NavigationView {
@@ -23,9 +33,26 @@ struct ContentView: View {
                         .keyboardType(.decimalPad)
                     TextField("Waist (cm)", text: $waist)
                         .keyboardType(.decimalPad)
+                    TextField("Neck (cm)", text: $neck)
+                        .keyboardType(.decimalPad)
+
+                    if selectedGender == .female {
+                        TextField("Hip (cm)", text: $hip)
+                            .keyboardType(.decimalPad)
+                    }
+
+                    TextField("Age (years)", text: $age)
+                        .keyboardType(.numberPad)
+
+                    Picker("Gender", selection: $selectedGender) {
+                        ForEach(Gender.allCases) { gender in
+                            Text(gender.rawValue).tag(gender)
+                        }
+                    }
+                    .pickerStyle(.segmented) // Segmented control for gender selection
                 }
 
-                Button("Calculate") {
+                Button("Calculate Body Fat") {
                     calculateBodyFat()
                 }
 
@@ -40,31 +67,47 @@ struct ContentView: View {
     }
 
     private func calculateBodyFat() {
-        // Ensure all inputs can be converted to Double
         guard let weightValue = Double(weight),
               let heightValue = Double(height),
-              let waistValue = Double(waist) else {
-            // Handle invalid input (e.g., non-numeric)
+              let waistValue = Double(waist),
+              let neckValue = Double(neck),
+              let ageValue = Double(age) else {
             bodyFatPercentage = "Invalid Input"
             return
         }
 
-        // Calculate Body Mass Index (BMI)
-        // BMI = weight (kg) / (height (m))^2
-        let heightInMeters = heightValue / 100 // Convert cm to meters
-        let bmi = weightValue / (heightInMeters * heightInMeters)
+        // Convert cm to inches for the US Navy formula
+        let heightInInches = heightValue * 0.393701
+        let waistInInches = waistValue * 0.393701
+        let neckInInches = neckValue * 0.393701
 
-        // Estimate Body Fat Percentage using a simplified formula based on BMI.
-        // This formula is often used for a general estimation and typically
-        // includes age and gender. For simplicity, we'll assume a male of age 30.
-        // Formula: Body Fat % = (1.20 * BMI) + (0.23 * Age) - (10.8 * Gender) - 5.4
-        // Gender: Male = 1, Female = 0
-        let age: Double = 30 // Assumed age for calculation
-        let genderFactor: Double = 1 // 1 for Male, 0 for Female (assuming Male for this example)
+        var estimatedBF: Double = 0.0
 
-        let estimatedBF = (1.20 * bmi) + (0.23 * age) - (10.8 * genderFactor) - 5.4
+        switch selectedGender {
+        case .male:
+            // US Navy Body Fat Formula for Men
+            // BF% = 495 / (1.0324 - 0.19077 * log10(waist(in) - neck(in)) + 0.15456 * log10(height(in))) - 450
+            let term1 = 1.0324
+            let term2 = 0.19077 * log10(waistInInches - neckInInches)
+            let term3 = 0.15456 * log10(heightInInches)
+            estimatedBF = 495 / (term1 - term2 + term3) - 450
 
-        // Format the result to one decimal place and ensure it's within 0-100%
+        case .female:
+            guard let hipValue = Double(hip) else {
+                bodyFatPercentage = "Invalid Input"
+                return
+            }
+            let hipInInches = hipValue * 0.393701
+
+            // US Navy Body Fat Formula for Women
+            // BF% = 495 / (1.29579 - 0.35004 * log10(waist(in) + hip(in) - neck(in)) + 0.22100 * log10(height(in))) - 450
+            let term1 = 1.29579
+            let term2 = 0.35004 * log10(waistInInches + hipInInches - neckInInches)
+            let term3 = 0.22100 * log10(heightInInches)
+            estimatedBF = 495 / (term1 - term2 + term3) - 450
+        }
+
+        // Ensure the percentage is between 0 and 100
         bodyFatPercentage = String(format: "%.1f", max(0, min(100, estimatedBF)))
     }
 }
