@@ -52,11 +52,21 @@ struct ContentView: View {
                     .pickerStyle(.segmented) // Segmented control for gender selection
                 }
 
+                // ...
                 Button("Calculate Body Fat") {
                     calculateBodyFat()
                 }
+                .padding(.vertical) // Butonun üstüne ve altına boşluk ekler
 
-                Section(header: Text("Body Fat Result")) {
+                Section(header: Text("Body Information").font(.headline).foregroundColor(.gray)) {
+                    Text("Estimated Body Fat: %\(bodyFatPercentage)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green) // Sonuca yeşil renk eklendi
+                }
+                // ...
+
+                Section(header: Text("Body Information").font(.headline).foregroundColor(.gray)) {
                     Text("Estimated Body Fat: %\(bodyFatPercentage)")
                         .font(.title2)
                         .fontWeight(.bold)
