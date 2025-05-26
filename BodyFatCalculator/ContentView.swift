@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var age: String = ""    // Age in years
     @State private var selectedGender: Gender = .male // Default to Male
     @State private var bodyFatPercentage: String = "0.0" // Body fat percentage
+    @State private var showingAlert: Bool = false // State for showing an alert
+    @State private var alertMessage: String = "" // Message to display in the alert
 
     enum Gender: String, CaseIterable, Identifiable {
         case male = "Male"
@@ -70,18 +72,23 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Body Fat Calculator") // Title for the navigation bar
+            .alert(isPresented: $showingAlert) { // Alert for error messages
+                Alert(title: Text("Input Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            }
         }
     }
 
     // Function to calculate body fat percentage based on US Navy formula
     private func calculateBodyFat() {
-        // Safely unwrap and convert input strings to Double
-        guard let weightValue = Double(weight),
-              let heightValue = Double(height),
-              let waistValue = Double(waist),
-              let neckValue = Double(neck),
-              let ageValue = Double(age) else {
-            bodyFatPercentage = "Invalid Input" // Display error for invalid numeric input
+        // Safely unwrap and convert input strings to Double, trimming whitespace
+        guard let weightValue = Double(weight.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let heightValue = Double(height.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let waistValue = Double(waist.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let neckValue = Double(neck.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let ageValue = Double(age.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            alertMessage = "Please enter valid numeric values for all fields."
+            showingAlert = true
+            bodyFatPercentage = "0.0" // Reset to default
             return
         }
 
@@ -95,6 +102,13 @@ struct ContentView: View {
         // Apply the specific formula based on selected gender
         switch selectedGender {
         case .male:
+            // Ensure (waist - neck) is positive to avoid log10 errors
+            guard (waistInInches - neckInInches) > 0 else {
+                alertMessage = "For men, waist circumference must be greater than neck circumference for calculation."
+                showingAlert = true
+                bodyFatPercentage = "0.0"
+                return
+            }
             // US Navy Body Fat Formula for Men:
             // BF% = 495 / (1.0324 - 0.19077 * log10(waist(in) - neck(in)) + 0.15456 * log10(height(in))) - 450
             let term1 = 1.0324
@@ -104,12 +118,21 @@ struct ContentView: View {
 
         case .female:
             // For females, hip circumference is also required
-            guard let hipValue = Double(hip) else {
-                bodyFatPercentage = "Invalid Input" // Display error if hip is missing for females
+            guard let hipValue = Double(hip.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                alertMessage = "Please enter a valid hip circumference for females."
+                showingAlert = true
+                bodyFatPercentage = "0.0"
                 return
             }
             let hipInInches = hipValue * 0.393701
 
+            // Ensure (waist + hip - neck) is positive to avoid log10 errors
+            guard (waistInInches + hipInInches - neckInInches) > 0 else {
+                alertMessage = "For women, the sum of waist and hip minus neck circumference must be positive for calculation."
+                showingAlert = true
+                bodyFatPercentage = "0.0"
+                return
+            }
             // US Navy Body Fat Formula for Women:
             // BF% = 495 / (1.29579 - 0.35004 * log10(waist(in) + hip(in) - neck(in)) + 0.22100 * log10(height(in))) - 450
             let term1 = 1.29579
