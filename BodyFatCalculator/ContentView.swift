@@ -74,12 +74,11 @@ struct ContentView: View {
                     .pickerStyle(.segmented)
                     .padding(.vertical, 4)
                     .onChange(of: selectedGender) { _ in
-                        // Reset hip measurement when gender changes to male
+                        // Reset hip measurement and body fat percentage when gender changes
                         if selectedGender == .male {
-                            hip = ""
+                            hip = "" // Clear hip field if switching to male
                         }
-                        // Reset body fat percentage when gender changes
-                        bodyFatPercentage = "0.0"
+                        bodyFatPercentage = "0.0" // Reset result to 0.0
                     }
                 }
 
@@ -95,6 +94,10 @@ struct ContentView: View {
                 }
                 .listRowBackground(Color.clear) // Remove default background for the button row
                 .padding(.vertical)
+
+                // Yeni Reset Butonu burada ekleniyor
+                ResetButton(action: resetAllFields) // Ayrı dosyadan gelen ResetButton'ı kullanıyoruz
+                    .listRowBackground(Color.clear) // Varsayılan liste satırı arka planını kaldırır
 
                 // Section to display the calculated body fat percentage
                 Section(header: Text("Results")
@@ -124,7 +127,7 @@ struct ContentView: View {
                 Alert(title: Text("Input Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
             }
             .onTapGesture {
-                // Dismiss keyboard when tapping outside of text fields
+                // Dismiss keyboard when tapping anywhere in the form
                 hideKeyboard()
             }
         }
@@ -132,20 +135,35 @@ struct ContentView: View {
 
     // MARK: - Private Functions
 
+    /// Helper function to safely convert a string to a Double.
+    /// Returns nil if conversion fails or if the resulting value is not positive (unless allowZero is true for age).
+    private func safeDouble(from string: String, allowZero: Bool = false) -> Double? {
+        let trimmedString = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedString.isEmpty { return nil } // Treat empty as invalid
+        guard let value = Double(trimmedString) else { return nil }
+        if !allowZero && value <= 0 { return nil } // Ensure positive for measurements
+        if allowZero && value < 0 { return nil } // Ensure non-negative for age
+        return value
+    }
+
     /// Function to calculate body fat percentage based on US Navy formula
     private func calculateBodyFat() {
-        // Dismiss keyboard before calculation
+        // Dismiss keyboard before calculation to ensure all inputs are committed
         hideKeyboard()
 
-        // Safely unwrap and convert input strings to Double, trimming whitespace
-        guard let weightValue = Double(weight.trimmingCharacters(in: .whitespacesAndNewlines)), weightValue > 0,
-              let heightValue = Double(height.trimmingCharacters(in: .whitespacesAndNewlines)), heightValue > 0,
-              let waistValue = Double(waist.trimmingCharacters(in: .whitespacesAndNewlines)), waistValue > 0,
-              let neckValue = Double(neck.trimmingCharacters(in: .whitespacesAndNewlines)), neckValue > 0,
-              let ageValue = Double(age.trimmingCharacters(in: .whitespacesAndNewlines)), ageValue >= 0 else {
+        // Reset alert state and message
+        alertMessage = ""
+        showingAlert = false
+        bodyFatPercentage = "0.0" // Reset result immediately on calculation attempt
+
+        // Safely unwrap and convert input strings to Double using the new helper
+        guard let weightValue = safeDouble(from: weight),
+              let heightValue = safeDouble(from: height),
+              let waistValue = safeDouble(from: waist),
+              let neckValue = safeDouble(from: neck),
+              let ageValue = safeDouble(from: age, allowZero: true) else { // Age can be 0 or positive
             alertMessage = "Please ensure all fields are filled with valid, positive numeric values. Age cannot be negative."
             showingAlert = true
-            bodyFatPercentage = "0.0" // Reset to default
             return
         }
 
@@ -159,72 +177,82 @@ struct ContentView: View {
         // Apply the specific formula based on selected gender
         switch selectedGender {
         case .male:
-            // Ensure (waist - neck) is positive to avoid log10 errors and practical limits
-            guard (waistInInches - neckInInches) > 0.01 else { // Using 0.01 for a small positive threshold
-                alertMessage = "For men, waist circumference must be noticeably greater than neck circumference for accurate calculation."
+            let logArgument = waistInInches - neckInInches
+            // Ensure the argument for log10 is strictly positive and sufficiently large
+            guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
+                alertMessage = "For men, your waist measurement must be significantly larger than your neck measurement to calculate body fat. Please re-check inputs."
                 showingAlert = true
-                bodyFatPercentage = "0.0"
                 return
             }
+
             // US Navy Body Fat Formula for Men:
             // BF% = 495 / (1.0324 - 0.19077 * log10(waist(in) - neck(in)) + 0.15456 * log10(height(in))) - 450
             let term1 = 1.0324
-            let term2 = 0.19077 * log10(waistInInches - neckInInches)
+            let term2 = 0.19077 * log10(logArgument)
             let term3 = 0.15456 * log10(heightInInches)
 
-            // Prevent division by zero or very small numbers close to zero
             let denominator = (term1 - term2 + term3)
             guard denominator != 0 else {
-                alertMessage = "Calculation error: Division by zero. Please check your inputs."
+                alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
                 showingAlert = true
-                bodyFatPercentage = "0.0"
                 return
             }
             estimatedBF = 495 / denominator - 450
 
         case .female:
             // For females, hip circumference is also required
-            guard let hipValue = Double(hip.trimmingCharacters(in: .whitespacesAndNewlines)), hipValue > 0 else {
+            guard let hipValue = safeDouble(from: hip) else {
                 alertMessage = "Please enter a valid, positive hip circumference for females."
                 showingAlert = true
-                bodyFatPercentage = "0.0"
                 return
             }
             let hipInInches = hipValue * 0.393701
 
-            // Ensure (waist + hip - neck) is positive to avoid log10 errors and practical limits
-            guard (waistInInches + hipInInches - neckInInches) > 0.01 else { // Using 0.01 for a small positive threshold
-                alertMessage = "For women, the sum of waist and hip minus neck circumference must be positive and significant for accurate calculation."
+            let logArgument = waistInInches + hipInInches - neckInInches
+            // Ensure the argument for log10 is strictly positive and sufficiently large
+            guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
+                alertMessage = "For women, the combined waist and hip measurements must be significantly larger than your neck measurement. Please re-check inputs."
                 showingAlert = true
-                bodyFatPercentage = "0.0"
                 return
             }
+
             // US Navy Body Fat Formula for Women:
             // BF% = 495 / (1.29579 - 0.35004 * log10(waist(in) + hip(in) - neck(in)) + 0.22100 * log10(height(in))) - 450
             let term1 = 1.29579
-            let term2 = 0.35004 * log10(waistInInches + hipInInches - neckInInches)
+            let term2 = 0.35004 * log10(logArgument)
             let term3 = 0.22100 * log10(heightInInches)
 
-            // Prevent division by zero or very small numbers close to zero
             let denominator = (term1 - term2 + term3)
             guard denominator != 0 else {
-                alertMessage = "Calculation error: Division by zero. Please check your inputs."
+                alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
                 showingAlert = true
-                bodyFatPercentage = "0.0"
                 return
             }
             estimatedBF = 495 / denominator - 450
         }
 
         // Format the result to one decimal place and ensure it's within 0-100%
-        // A very low or negative body fat percentage is physiologically impossible.
-        // A very high percentage might indicate extreme obesity but values should be capped for presentation.
-        bodyFatPercentage = String(format: "%.1f", max(0, min(100, estimatedBF)))
+        bodyFatPercentage = String(format: "%.1f", max(0.0, min(100.0, estimatedBF)))
     }
 
     /// Helper function to dismiss the keyboard
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    /// Function to reset all input fields and results
+    private func resetAllFields() {
+        weight = ""
+        height = ""
+        waist = ""
+        neck = ""
+        hip = ""
+        age = ""
+        selectedGender = .male // Reset to default gender
+        bodyFatPercentage = "0.0" // Reset result
+        alertMessage = "" // Clear any previous alert message
+        showingAlert = false // Hide any active alert
+        hideKeyboard() // Dismiss keyboard
     }
 }
 
