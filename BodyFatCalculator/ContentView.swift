@@ -84,7 +84,7 @@ struct ContentView: View {
 
                 // Button to trigger the body fat calculation
                 Button(action: calculateBodyFat) {
-                    Label("Calculate Body Fat", systemImage: "arrow.triangle.right.circle.fill")
+                    Label("Calculate Body Fat", systemImage: "arrow.right.circle.fill")
                         .font(.headline)
                         .foregroundColor(.white)
                         .padding()
@@ -95,9 +95,9 @@ struct ContentView: View {
                 .listRowBackground(Color.clear) // Remove default background for the button row
                 .padding(.vertical)
 
-                // Yeni Reset Butonu burada ekleniyor
-                ResetButton(action: resetAllFields) // Ayrı dosyadan gelen ResetButton'ı kullanıyoruz
-                    .listRowBackground(Color.clear) // Varsayılan liste satırı arka planını kaldırır
+                // New Reset Button here
+                ResetButton(action: resetAllFields)
+                    .listRowBackground(Color.clear)
 
                 // Section to display the calculated body fat percentage
                 Section(header: Text("Results")
@@ -156,21 +156,46 @@ struct ContentView: View {
         showingAlert = false
         bodyFatPercentage = "0.0" // Reset result immediately on calculation attempt
 
+        // --- DEBUG PRINT: Raw input strings ---
+        print("DEBUG: Raw Inputs - Weight: '\(weight)', Height: '\(height)', Waist: '\(waist)', Neck: '\(neck)', Hip: '\(hip)', Age: '\(age)'")
+
         // Safely unwrap and convert input strings to Double using the new helper
-        guard let weightValue = safeDouble(from: weight),
-              let heightValue = safeDouble(from: height),
-              let waistValue = safeDouble(from: waist),
-              let neckValue = safeDouble(from: neck),
-              let ageValue = safeDouble(from: age, allowZero: true) else { // Age can be 0 or positive
-            alertMessage = "Please ensure all fields are filled with valid, positive numeric values. Age cannot be negative."
+        guard let weightValue = safeDouble(from: weight) else {
+            alertMessage = "Please enter a valid, positive number for Weight."
             showingAlert = true
             return
         }
+        guard let heightValue = safeDouble(from: height) else {
+            alertMessage = "Please enter a valid, positive number for Height."
+            showingAlert = true
+            return
+        }
+        guard let waistValue = safeDouble(from: waist) else {
+            alertMessage = "Please enter a valid, positive number for Waist."
+            showingAlert = true
+            return
+        }
+        guard let neckValue = safeDouble(from: neck) else {
+            alertMessage = "Please enter a valid, positive number for Neck."
+            showingAlert = true
+            return
+        }
+        guard let ageValue = safeDouble(from: age, allowZero: true) else {
+            alertMessage = "Please enter a valid, non-negative number for Age."
+            showingAlert = true
+            return
+        }
+        // --- DEBUG PRINT: Converted Double values ---
+        print("DEBUG: Converted Values - Weight: \(weightValue), Height: \(heightValue), Waist: \(waistValue), Neck: \(neckValue), Age: \(ageValue)")
+
 
         // Convert cm measurements to inches for the US Navy formula
         let heightInInches = heightValue * 0.393701
         let waistInInches = waistValue * 0.393701
         let neckInInches = neckValue * 0.393701
+
+        // --- DEBUG PRINT: Converted to Inches ---
+        print("DEBUG: Inches Values - Height: \(heightInInches), Waist: \(waistInInches), Neck: \(neckInInches)")
 
         var estimatedBF: Double = 0.0
 
@@ -178,6 +203,9 @@ struct ContentView: View {
         switch selectedGender {
         case .male:
             let logArgument = waistInInches - neckInInches
+            // --- DEBUG PRINT: Male logArgument ---
+            print("DEBUG: Male logArgument (waist - neck): \(logArgument)")
+
             // Ensure the argument for log10 is strictly positive and sufficiently large
             guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
                 alertMessage = "For men, your waist measurement must be significantly larger than your neck measurement to calculate body fat. Please re-check inputs."
@@ -192,6 +220,9 @@ struct ContentView: View {
             let term3 = 0.15456 * log10(heightInInches)
 
             let denominator = (term1 - term2 + term3)
+            // --- DEBUG PRINT: Male Denominator ---
+            print("DEBUG: Male Denominator: \(denominator)")
+
             guard denominator != 0 else {
                 alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
                 showingAlert = true
@@ -207,8 +238,13 @@ struct ContentView: View {
                 return
             }
             let hipInInches = hipValue * 0.393701
+            // --- DEBUG PRINT: Female Hip in Inches ---
+            print("DEBUG: Female Hip in Inches: \(hipInInches)")
 
             let logArgument = waistInInches + hipInInches - neckInInches
+            // --- DEBUG PRINT: Female logArgument (waist + hip - neck): \(logArgument) ---
+            print("DEBUG: Female logArgument: \(logArgument)")
+
             // Ensure the argument for log10 is strictly positive and sufficiently large
             guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
                 alertMessage = "For women, the combined waist and hip measurements must be significantly larger than your neck measurement. Please re-check inputs."
@@ -223,6 +259,9 @@ struct ContentView: View {
             let term3 = 0.22100 * log10(heightInInches)
 
             let denominator = (term1 - term2 + term3)
+            // --- DEBUG PRINT: Female Denominator ---
+            print("DEBUG: Female Denominator: \(denominator)")
+
             guard denominator != 0 else {
                 alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
                 showingAlert = true
@@ -233,6 +272,8 @@ struct ContentView: View {
 
         // Format the result to one decimal place and ensure it's within 0-100%
         bodyFatPercentage = String(format: "%.1f", max(0.0, min(100.0, estimatedBF)))
+        // --- DEBUG PRINT: Final Body Fat Percentage ---
+        print("DEBUG: Final Estimated Body Fat: \(bodyFatPercentage)%")
     }
 
     /// Helper function to dismiss the keyboard
@@ -253,6 +294,7 @@ struct ContentView: View {
         alertMessage = "" // Clear any previous alert message
         showingAlert = false // Hide any active alert
         hideKeyboard() // Dismiss keyboard
+        print("DEBUG: All fields reset.")
     }
 }
 
