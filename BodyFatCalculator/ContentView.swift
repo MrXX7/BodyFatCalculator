@@ -17,8 +17,13 @@ struct ContentView: View {
     @State private var age: String = ""         // Age in years
     @State private var selectedGender: Gender = .male // Default to Male
     @State private var bodyFatPercentage: String = "0.0" // Body fat percentage
-    @State private var showingAlert: Bool = false // State for showing an alert
-    @State private var alertMessage: String = "" // Message to display in the alert
+    
+    // New state for explicitly showing error message below result
+    @State private var calculationStatusMessage: String = "Enter your measurements to get started!"
+    @State private var calculationStatusColor: Color = .secondary
+
+    // Using `InputError?` to conform to `Identifiable` for `.alert(item:)`
+    @State private var activeAlert: InputError?
 
     // MARK: - Enums
     enum Gender: String, CaseIterable, Identifiable {
@@ -32,35 +37,35 @@ struct ContentView: View {
         NavigationView {
             Form {
                 // Section for collecting body measurements
-                Section(header: Text("Body Information")
+                Section(header: Text("BODY INFORMATION")
                     .font(.headline)
                     .foregroundColor(.accentColor)
                 ) {
-                    Group { // Grouping TextFields for better readability
-                        TextField("Weight (kg)", text: $weight)
+                    Group {
+                        TextField("Weight (kg)", text: $weight, prompt: Text("e.g., 75.0"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Height (cm)", text: $height)
+                        TextField("Height (cm)", text: $height, prompt: Text("e.g., 170.0"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Waist (cm)", text: $waist)
+                        TextField("Waist (cm)", text: $waist, prompt: Text("e.g., 80.0"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Neck (cm)", text: $neck)
+                        TextField("Neck (cm)", text: $neck, prompt: Text("e.g., 35.0"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
                     }
-                    .padding(.vertical, 4) // Add slight vertical padding for each text field
+                    .padding(.vertical, 4)
 
                     // Hip measurement is only required for females
                     if selectedGender == .female {
-                        TextField("Hip (cm)", text: $hip)
+                        TextField("Hip (cm)", text: $hip, prompt: Text("e.g., 90.0 (for females)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
                             .padding(.vertical, 4)
                     }
 
-                    TextField("Age (years)", text: $age)
+                    TextField("Age (years)", text: $age, prompt: Text("e.g., 30"))
                         .keyboardType(.numberPad)
                         .autocorrectionDisabled()
                         .padding(.vertical, 4)
@@ -74,11 +79,10 @@ struct ContentView: View {
                     .pickerStyle(.segmented)
                     .padding(.vertical, 4)
                     .onChange(of: selectedGender) { _ in
-                        // Reset hip measurement and body fat percentage when gender changes
                         if selectedGender == .male {
-                            hip = "" // Clear hip field if switching to male
+                            hip = ""
                         }
-                        bodyFatPercentage = "0.0" // Reset result to 0.0
+                        resetCalculationDisplay() // Reset result and message on gender change
                     }
                 }
 
@@ -92,42 +96,46 @@ struct ContentView: View {
                         .background(Color.blue)
                         .cornerRadius(10)
                 }
-                .listRowBackground(Color.clear) // Remove default background for the button row
+                .listRowBackground(Color.clear)
                 .padding(.vertical)
 
-                // New Reset Button here
+                // Reset Button
                 ResetButton(action: resetAllFields)
                     .listRowBackground(Color.clear)
 
-                // Section to display the calculated body fat percentage
-                Section(header: Text("Results")
+                // Section to display the calculated body fat percentage and status message
+                Section(header: Text("RESULTS")
                     .font(.headline)
                     .foregroundColor(.accentColor)
                 ) {
-                    HStack {
-                        Spacer()
-                        VStack(alignment: .center) {
-                            Text("Estimated Body Fat:")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                            Text("\(bodyFatPercentage)%")
-                                .font(.largeTitle)
-                                .fontWeight(.heavy)
-                                .foregroundColor(.green) // Highlight the result in green
-                                .animation(.easeIn, value: bodyFatPercentage) // Animate the text change
-                        }
-                        Spacer()
+                    VStack(alignment: .center, spacing: 10) {
+                        Text("Estimated Body Fat:")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        
+                        Text("\(bodyFatPercentage)%")
+                            .font(.largeTitle)
+                            .fontWeight(.heavy)
+                            .foregroundColor(.green)
+                            .animation(.easeIn, value: bodyFatPercentage)
+
+                        Text(calculationStatusMessage)
+                            .font(.caption)
+                            .foregroundColor(calculationStatusColor)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+                    .frame(maxWidth: .infinity) // Center the VStack content
                     .padding(.vertical)
                 }
             }
-            .navigationTitle("Body Fat Calculator") // Title for the navigation bar
-            .navigationBarTitleDisplayMode(.inline) // Make title smaller and inline
-            .alert(isPresented: $showingAlert) { // Alert for error messages
-                Alert(title: Text("Input Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            .navigationTitle("Body Fat Calculator")
+            .navigationBarTitleDisplayMode(.inline)
+            // Use .alert(item:) with Identifiable Error
+            .alert(item: $activeAlert) { error in
+                Alert(title: Text("Input Error"), message: Text(error.localizedDescription), dismissButton: .default(Text("OK")))
             }
             .onTapGesture {
-                // Dismiss keyboard when tapping anywhere in the form
                 hideKeyboard()
             }
         }
@@ -135,145 +143,95 @@ struct ContentView: View {
 
     // MARK: - Private Functions
 
-    /// Helper function to safely convert a string to a Double.
-    /// Returns nil if conversion fails or if the resulting value is not positive (unless allowZero is true for age).
-    private func safeDouble(from string: String, allowZero: Bool = false) -> Double? {
-        let trimmedString = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedString.isEmpty { return nil } // Treat empty as invalid
-        guard let value = Double(trimmedString) else { return nil }
-        if !allowZero && value <= 0 { return nil } // Ensure positive for measurements
-        if allowZero && value < 0 { return nil } // Ensure non-negative for age
-        return value
-    }
-
     /// Function to calculate body fat percentage based on US Navy formula
     private func calculateBodyFat() {
-        // Dismiss keyboard before calculation to ensure all inputs are committed
         hideKeyboard()
+        resetCalculationDisplay() // Reset status before new calculation attempt
 
-        // Reset alert state and message
-        alertMessage = ""
-        showingAlert = false
-        bodyFatPercentage = "0.0" // Reset result immediately on calculation attempt
+        let validator = InputValidator()
 
-        // --- DEBUG PRINT: Raw input strings ---
-        print("DEBUG: Raw Inputs - Weight: '\(weight)', Height: '\(height)', Waist: '\(waist)', Neck: '\(neck)', Hip: '\(hip)', Age: '\(age)'")
+        // Validate all inputs first
+        let validationResult = validator.validateInputs(
+            weight: weight,
+            height: height,
+            waist: waist,
+            neck: neck,
+            hip: hip,
+            age: age,
+            gender: selectedGender
+        )
 
-        // Safely unwrap and convert input strings to Double using the new helper
-        guard let weightValue = safeDouble(from: weight) else {
-            alertMessage = "Please enter a valid, positive number for Weight."
-            showingAlert = true
-            return
-        }
-        guard let heightValue = safeDouble(from: height) else {
-            alertMessage = "Please enter a valid, positive number for Height."
-            showingAlert = true
-            return
-        }
-        guard let waistValue = safeDouble(from: waist) else {
-            alertMessage = "Please enter a valid, positive number for Waist."
-            showingAlert = true
-            return
-        }
-        guard let neckValue = safeDouble(from: neck) else {
-            alertMessage = "Please enter a valid, positive number for Neck."
-            showingAlert = true
-            return
-        }
-        guard let ageValue = safeDouble(from: age, allowZero: true) else {
-            alertMessage = "Please enter a valid, non-negative number for Age."
-            showingAlert = true
-            return
-        }
-        // --- DEBUG PRINT: Converted Double values ---
-        print("DEBUG: Converted Values - Weight: \(weightValue), Height: \(heightValue), Waist: \(waistValue), Neck: \(neckValue), Age: \(ageValue)")
+        switch validationResult {
+        case .success(let inputs):
+            // Inputs are valid, proceed with calculation
+            let heightInInches = inputs.height * AppConstants.cmToInches
+            let waistInInches = inputs.waist * AppConstants.cmToInches
+            let neckInInches = inputs.neck * AppConstants.cmToInches
 
+            var estimatedBF: Double = 0.0
 
-        // Convert cm measurements to inches for the US Navy formula
-        let heightInInches = heightValue * 0.393701
-        let waistInInches = waistValue * 0.393701
-        let neckInInches = neckValue * 0.393701
+            switch selectedGender {
+            case .male:
+                let logArgument = waistInInches - neckInInches
+                guard logArgument > AppConstants.logArgumentThreshold else {
+                    activeAlert = .maleCircumferenceIssue
+                    updateCalculationStatus(message: "Check waist/neck input.", color: .red)
+                    return
+                }
 
-        // --- DEBUG PRINT: Converted to Inches ---
-        print("DEBUG: Inches Values - Height: \(heightInInches), Waist: \(waistInInches), Neck: \(neckInInches)")
+                let term1 = AppConstants.maleFormulaTerm1
+                let term2 = AppConstants.maleFormulaTerm2Factor * log10(logArgument)
+                let term3 = AppConstants.maleFormulaTerm3Factor * log10(heightInInches)
 
-        var estimatedBF: Double = 0.0
+                let denominator = (term1 - term2 + term3)
+                guard denominator != 0 else {
+                    activeAlert = .calculationDivisionByZero
+                    updateCalculationStatus(message: "Calculation error. Values might be unrealistic.", color: .red)
+                    return
+                }
+                estimatedBF = AppConstants.maleFormulaNumerator / denominator - AppConstants.maleFormulaSubtract
 
-        // Apply the specific formula based on selected gender
-        switch selectedGender {
-        case .male:
-            let logArgument = waistInInches - neckInInches
-            // --- DEBUG PRINT: Male logArgument ---
-            print("DEBUG: Male logArgument (waist - neck): \(logArgument)")
+            case .female:
+                           // inputs.hip already comes as Double?, but we know it's non-nil here
+                           // as it passed validation for females. We need to unwrap it before multiplying.
+                           guard let actualHipValue = inputs.hip else {
+                               // This scenario should ideally not be reached if InputValidator works correctly for females,
+                               // but it acts as a safeguard.
+                               activeAlert = .invalidHip
+                               updateCalculationStatus(message: "Hip measurement is unexpectedly missing.", color: .red)
+                               return
+                           }
+                           let hipInInches = actualHipValue * AppConstants.cmToInches // Şimdi direkt Double ile çarpıyoruz
 
-            // Ensure the argument for log10 is strictly positive and sufficiently large
-            guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
-                alertMessage = "For men, your waist measurement must be significantly larger than your neck measurement to calculate body fat. Please re-check inputs."
-                showingAlert = true
-                return
+                           let logArgument = waistInInches + hipInInches - neckInInches
+                           guard logArgument > AppConstants.logArgumentThreshold else {
+                               activeAlert = .femaleCircumferenceIssue
+                               updateCalculationStatus(message: "Check waist/hip/neck input.", color: .red)
+                               return
+                           }
+
+                let term1 = AppConstants.femaleFormulaTerm1
+                let term2 = AppConstants.femaleFormulaTerm2Factor * log10(logArgument)
+                let term3 = AppConstants.femaleFormulaTerm3Factor * log10(heightInInches)
+
+                let denominator = (term1 - term2 + term3)
+                guard denominator != 0 else {
+                    activeAlert = .calculationDivisionByZero
+                    updateCalculationStatus(message: "Calculation error. Values might be unrealistic.", color: .red)
+                    return
+                }
+                estimatedBF = AppConstants.femaleFormulaNumerator / denominator - AppConstants.femaleFormulaSubtract
             }
 
-            // US Navy Body Fat Formula for Men:
-            // BF% = 495 / (1.0324 - 0.19077 * log10(waist(in) - neck(in)) + 0.15456 * log10(height(in))) - 450
-            let term1 = 1.0324
-            let term2 = 0.19077 * log10(logArgument)
-            let term3 = 0.15456 * log10(heightInInches)
+            // Format the result and ensure it's within 0-100%
+            bodyFatPercentage = String(format: "%.1f", max(0.0, min(100.0, estimatedBF)))
+            updateCalculationStatus(message: "Your estimated body fat percentage.", color: .secondary)
 
-            let denominator = (term1 - term2 + term3)
-            // --- DEBUG PRINT: Male Denominator ---
-            print("DEBUG: Male Denominator: \(denominator)")
-
-            guard denominator != 0 else {
-                alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
-                showingAlert = true
-                return
-            }
-            estimatedBF = 495 / denominator - 450
-
-        case .female:
-            // For females, hip circumference is also required
-            guard let hipValue = safeDouble(from: hip) else {
-                alertMessage = "Please enter a valid, positive hip circumference for females."
-                showingAlert = true
-                return
-            }
-            let hipInInches = hipValue * 0.393701
-            // --- DEBUG PRINT: Female Hip in Inches ---
-            print("DEBUG: Female Hip in Inches: \(hipInInches)")
-
-            let logArgument = waistInInches + hipInInches - neckInInches
-            // --- DEBUG PRINT: Female logArgument (waist + hip - neck): \(logArgument) ---
-            print("DEBUG: Female logArgument: \(logArgument)")
-
-            // Ensure the argument for log10 is strictly positive and sufficiently large
-            guard logArgument > 0.1 else { // Increased threshold slightly for more robust calculation
-                alertMessage = "For women, the combined waist and hip measurements must be significantly larger than your neck measurement. Please re-check inputs."
-                showingAlert = true
-                return
-            }
-
-            // US Navy Body Fat Formula for Women:
-            // BF% = 495 / (1.29579 - 0.35004 * log10(waist(in) + hip(in) - neck(in)) + 0.22100 * log10(height(in))) - 450
-            let term1 = 1.29579
-            let term2 = 0.35004 * log10(logArgument)
-            let term3 = 0.22100 * log10(heightInInches)
-
-            let denominator = (term1 - term2 + term3)
-            // --- DEBUG PRINT: Female Denominator ---
-            print("DEBUG: Female Denominator: \(denominator)")
-
-            guard denominator != 0 else {
-                alertMessage = "A calculation error occurred (division by zero). Please verify your measurements are realistic."
-                showingAlert = true
-                return
-            }
-            estimatedBF = 495 / denominator - 450
+        case .failure(let error):
+            // Validation failed, set the alert and update status message
+            activeAlert = error
+            updateCalculationStatus(message: error.localizedDescription, color: .red)
         }
-
-        // Format the result to one decimal place and ensure it's within 0-100%
-        bodyFatPercentage = String(format: "%.1f", max(0.0, min(100.0, estimatedBF)))
-        // --- DEBUG PRINT: Final Body Fat Percentage ---
-        print("DEBUG: Final Estimated Body Fat: \(bodyFatPercentage)%")
     }
 
     /// Helper function to dismiss the keyboard
@@ -290,11 +248,21 @@ struct ContentView: View {
         hip = ""
         age = ""
         selectedGender = .male // Reset to default gender
-        bodyFatPercentage = "0.0" // Reset result
-        alertMessage = "" // Clear any previous alert message
-        showingAlert = false // Hide any active alert
-        hideKeyboard() // Dismiss keyboard
-        print("DEBUG: All fields reset.")
+        resetCalculationDisplay() // Reset result and status message
+        hideKeyboard()
+    }
+    
+    /// Resets the body fat percentage and status message display.
+    private func resetCalculationDisplay() {
+        bodyFatPercentage = "0.0"
+        calculationStatusMessage = "Enter your measurements to get started!"
+        calculationStatusColor = .secondary
+    }
+    
+    /// Updates the status message below the body fat percentage.
+    private func updateCalculationStatus(message: String, color: Color) {
+        calculationStatusMessage = message
+        calculationStatusColor = color
     }
 }
 
