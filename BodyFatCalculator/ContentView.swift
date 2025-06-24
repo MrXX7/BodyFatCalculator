@@ -18,7 +18,7 @@ struct ContentView: View {
     @State private var selectedGender: Gender = .male // Default to Male
     @State private var bodyFatPercentage: String = "0.0" // Body fat percentage
     
-    // New state for explicitly showing error message below result
+    // State for explicitly showing error message below result
     @State private var calculationStatusMessage: String = "Enter your measurements to get started!"
     @State private var calculationStatusColor: Color = .secondary
 
@@ -79,9 +79,6 @@ struct ContentView: View {
                     .pickerStyle(.segmented)
                     .padding(.vertical, 4)
                     .onChange(of: selectedGender) { _ in
-                        if selectedGender == .male {
-                            hip = ""
-                        }
                         resetCalculationDisplay() // Reset result and message on gender change
                     }
                 }
@@ -192,23 +189,22 @@ struct ContentView: View {
                 estimatedBF = AppConstants.maleFormulaNumerator / denominator - AppConstants.maleFormulaSubtract
 
             case .female:
-                           // inputs.hip already comes as Double?, but we know it's non-nil here
-                           // as it passed validation for females. We need to unwrap it before multiplying.
-                           guard let actualHipValue = inputs.hip else {
-                               // This scenario should ideally not be reached if InputValidator works correctly for females,
-                               // but it acts as a safeguard.
-                               activeAlert = .invalidHip
-                               updateCalculationStatus(message: "Hip measurement is unexpectedly missing.", color: .red)
-                               return
-                           }
-                           let hipInInches = actualHipValue * AppConstants.cmToInches // Şimdi direkt Double ile çarpıyoruz
+                // FIX: inputs.hip is a Double?, we need to safely unwrap it here for multiplication.
+                guard let actualHipValue = inputs.hip else {
+                    // This scenario should ideally not be reached if InputValidator works correctly for females,
+                    // but it acts as a safeguard.
+                    activeAlert = .invalidHip
+                    updateCalculationStatus(message: "Hip measurement is unexpectedly missing.", color: .red)
+                    return
+                }
+                let hipInInches = actualHipValue * AppConstants.cmToInches // Corrected line
 
-                           let logArgument = waistInInches + hipInInches - neckInInches
-                           guard logArgument > AppConstants.logArgumentThreshold else {
-                               activeAlert = .femaleCircumferenceIssue
-                               updateCalculationStatus(message: "Check waist/hip/neck input.", color: .red)
-                               return
-                           }
+                let logArgument = waistInInches + hipInInches - neckInInches
+                guard logArgument > AppConstants.logArgumentThreshold else {
+                    activeAlert = .femaleCircumferenceIssue
+                    updateCalculationStatus(message: "Check waist/hip/neck input.", color: .red)
+                    return
+                }
 
                 let term1 = AppConstants.femaleFormulaTerm1
                 let term2 = AppConstants.femaleFormulaTerm2Factor * log10(logArgument)

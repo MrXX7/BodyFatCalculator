@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI // Required for Color type in InputError (if you uncomment the color property later, for now it's fine)
 
 enum InputError: Error, LocalizedError, Identifiable {
     case invalidWeight
@@ -52,10 +53,10 @@ struct InputValidator {
     // Returns nil if conversion fails or if the resulting value is not positive (unless allowZero is true for age).
     func safeDouble(from string: String, allowZero: Bool = false) -> Double? {
         let trimmedString = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedString.isEmpty { return nil }
+        if trimmedString.isEmpty { return nil } // Treat empty as invalid
         guard let value = Double(trimmedString) else { return nil }
-        if !allowZero && value <= 0 { return nil }
-        if allowZero && value < 0 { return nil }
+        if !allowZero && value <= 0 { return nil } // Ensure positive for measurements
+        if allowZero && value < 0 { return nil } // Ensure non-negative for age
         return value
     }
     
