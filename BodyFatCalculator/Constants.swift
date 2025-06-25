@@ -5,13 +5,6 @@
 //  Created by Oncu Can on 13.06.2025.
 //
 
-//
-//  Constants.swift
-//  BodyFatCalculator
-//
-//  Created by Your Name on 2025-06-13.
-//
-
 import Foundation
 
 struct AppConstants {

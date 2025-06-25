@@ -132,9 +132,9 @@ struct ContentView: View {
             .alert(item: $activeAlert) { error in
                 Alert(title: Text("Input Error"), message: Text(error.localizedDescription), dismissButton: .default(Text("OK")))
             }
-            .onTapGesture {
-                hideKeyboard()
-            }
+//            .onTapGesture {
+//                hideKeyboard()
+//            }
         }
     }
 
