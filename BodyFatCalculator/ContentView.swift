@@ -42,16 +42,16 @@ struct ContentView: View {
                     .foregroundColor(.accentColor)
                 ) {
                     Group {
-                        TextField("Weight (kg)", text: $weight, prompt: Text("e.g., 75.0"))
+                        TextField("Weight (kg)", text: $weight, prompt: Text("Weight (kg)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Height (cm)", text: $height, prompt: Text("e.g., 170.0"))
+                        TextField("Height (cm)", text: $height, prompt: Text("Height (cm)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Waist (cm)", text: $waist, prompt: Text("e.g., 80.0"))
+                        TextField("Waist (cm)", text: $waist, prompt: Text("Waist (cm)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
-                        TextField("Neck (cm)", text: $neck, prompt: Text("e.g., 35.0"))
+                        TextField("Neck (cm)", text: $neck, prompt: Text("Neck (cm)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
                     }
@@ -59,13 +59,13 @@ struct ContentView: View {
 
                     // Hip measurement is only required for females
                     if selectedGender == .female {
-                        TextField("Hip (cm)", text: $hip, prompt: Text("e.g., 90.0 (for females)"))
+                        TextField("Hip (cm)", text: $hip, prompt: Text("Hip (cm) (for females)"))
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled()
                             .padding(.vertical, 4)
                     }
 
-                    TextField("Age (years)", text: $age, prompt: Text("e.g., 30"))
+                    TextField("Age (years)", text: $age, prompt: Text("Age (years)"))
                         .keyboardType(.numberPad)
                         .autocorrectionDisabled()
                         .padding(.vertical, 4)
