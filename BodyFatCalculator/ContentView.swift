@@ -43,18 +43,12 @@ struct ContentView: View {
                 ) {
                     Group {
                         TextField("Weight (kg)", text: $weight, prompt: Text("Weight (kg)"))
-                            .keyboardType(.decimalPad)
-                            .autocorrectionDisabled()
                         TextField("Height (cm)", text: $height, prompt: Text("Height (cm)"))
-                            .keyboardType(.decimalPad)
-                            .autocorrectionDisabled()
                         TextField("Waist (cm)", text: $waist, prompt: Text("Waist (cm)"))
-                            .keyboardType(.decimalPad)
-                            .autocorrectionDisabled()
                         TextField("Neck (cm)", text: $neck, prompt: Text("Neck (cm)"))
-                            .keyboardType(.decimalPad)
-                            .autocorrectionDisabled()
                     }
+                    .keyboardType(.decimalPad)
+                    .autocorrectionDisabled()
                     .padding(.vertical, 4)
 
                     // Hip measurement is only required for females
