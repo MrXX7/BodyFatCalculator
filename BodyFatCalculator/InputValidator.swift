@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftUI // Required for Color type in InputError (if you uncomment the color property later, for now it's fine)
+import SwiftUI
 
 enum InputError: Error, LocalizedError, Identifiable {
     case invalidWeight
@@ -18,9 +18,21 @@ enum InputError: Error, LocalizedError, Identifiable {
     case maleCircumferenceIssue
     case femaleCircumferenceIssue
     case calculationDivisionByZero
-    case genericInvalidInput // For any other non-specific numeric parsing errors
+    case genericInvalidInput
 
-    var id: String { self.localizedDescription } // Required for Identifiable for SwiftUI Alerts
+    var fieldId: String? {
+        switch self {
+        case .invalidWeight: return "weight"
+        case .invalidHeight: return "height"
+        case .invalidWaist: return "waist"
+        case .invalidNeck: return "neck"
+        case .invalidHip: return "hip"
+        case .invalidAge: return "age"
+        default: return nil
+        }
+    }
+
+    var id: String { self.localizedDescription }
 
     var errorDescription: String? {
         switch self {
@@ -49,18 +61,15 @@ enum InputError: Error, LocalizedError, Identifiable {
 }
 
 struct InputValidator {
-    // Helper function to safely convert a string to a Double.
-    // Returns nil if conversion fails or if the resulting value is not positive (unless allowZero is true for age).
     func safeDouble(from string: String, allowZero: Bool = false) -> Double? {
         let trimmedString = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedString.isEmpty { return nil } // Treat empty as invalid
+        if trimmedString.isEmpty { return nil }
         guard let value = Double(trimmedString) else { return nil }
-        if !allowZero && value <= 0 { return nil } // Ensure positive for measurements
-        if allowZero && value < 0 { return nil } // Ensure non-negative for age
+        if !allowZero && value <= 0 { return nil }
+        if allowZero && value < 0 { return nil }
         return value
     }
     
-    // Validate all inputs and return parsed values or a specific error
     func validateInputs(
         weight: String,
         height: String,
@@ -68,7 +77,7 @@ struct InputValidator {
         neck: String,
         hip: String,
         age: String,
-        gender: ContentView.Gender
+        gender: BodyFatCalculatorViewModel.Gender // ViewModel'daki Gender'ı kullanmak için bu enum'ı ContentView'de de tutmalıyız veya ViewModel'ın enum'unu kullanmalıyız. Şu anlık ContentView'deki referansa devam ettim.
     ) -> Result<(weight: Double, height: Double, waist: Double, neck: Double, hip: Double?, age: Double), InputError> {
 
         guard let weightValue = safeDouble(from: weight) else { return .failure(.invalidWeight) }

@@ -17,7 +17,7 @@ struct ResetButton: View {
                 .foregroundColor(.white)
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color.orange)
+                .background(Color.orange) // Distinct color for the reset button
                 .cornerRadius(10)
         }
         .listRowBackground(Color.clear)
@@ -25,7 +25,6 @@ struct ResetButton: View {
     }
 }
 
-// MARK: - Preview Provider (Opsiyonel, SwiftUI Canvas için)
 struct ResetButton_Previews: PreviewProvider {
     static var previews: some View {
         Form {
